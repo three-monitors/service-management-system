@@ -7,8 +7,8 @@ def add_client(clients):
     if name in clients:  # валідація
         print("Client already exists")
         return
-clients.append(name)
-print(f"Client '{name}' added")
+    clients.append(name)
+    print(f"Client '{name}' added")
 
 # Функція: створити запис
 def create_appointment(clients, appointments):
@@ -28,8 +28,8 @@ def create_appointment(clients, appointments):
         "master": master,
         "status": "Scheduled"
     }
-appointments.append(appointment)
-print("Appointment created!")
+    appointments.append(appointment)
+    print("Appointment created!")
 
 # Функція: показати записи
 def show_appointments(appointments):
@@ -111,7 +111,7 @@ def main():
         print("\n1. Add client")
         print("2. Create appointment")
         print("3. Show appointments")
-        print("4. Delete")
+        print("4. Delete appointment")
         print("5. Search appointments")
         print("6. Change status")
         print("7. Exit")
@@ -126,6 +126,10 @@ def main():
         elif choice == "4":
             delete_appointment(appointments)
         elif choice == "5":
+            search_appointments(appointments)
+        elif choice == "6":
+            change_status(appointments)
+        elif choice == "7":
             print("Goodbye!"); break
         else:
             print("Unknown option, try again")
