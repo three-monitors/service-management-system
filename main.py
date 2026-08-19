@@ -1,3 +1,7 @@
+import json
+import csv
+import re
+
 # Функція: додати клієнта
 def add_client(clients):
     name = input("Client name: ").strip()
@@ -7,7 +11,34 @@ def add_client(clients):
     if name in clients:  # валідація
         print("Client already exists")
         return
-    clients.append(name)
+
+    # Валідація телефону
+    phone = input("Phone (format: +380-XX-XXX-XX-XX): ").strip()
+    if not re.fullmatch(r"\+\d{3}-\d{2}-\d{3}-\d{2}-\d{2}", phone):
+        print("Invalid phone format. Use +380-XX-XXX-XX-XX")
+        return
+
+    # Валідація email
+    email = input("Email: ").strip()
+    if not re.fullmatch(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", email):
+        print("Invalid email format")
+        return
+
+    # Заборона доменів .ru, .su, .рф
+    banned_domains = [".ru", ".su", ".рф"]
+    email_lower = email.lower()
+ 
+    for domain in banned_domains:
+        if email_lower.endswith(domain):
+            print(f"The use of email with the {domain} domain is prohibited")
+            return
+
+    client = {
+        "name": name,
+        "phone": phone,
+        "email": email
+    }
+    clients.append(client)
     print(f"Client '{name}' added")
 
 # Функція: створити запис
@@ -15,15 +46,23 @@ def create_appointment(clients, appointments):
     if len(clients) == 0:
         print("No clients yet. Add a client first.")
         return
-    print("Clients:", clients)
-    client = input("Client name: ").strip()
-    if client not in clients:
+    print("Clients:", [client["name"] for client in clients])
+    client_name = input("Client name: ").strip()
+
+    # Знайти клієнта за іменем
+    client = None
+    for c in clients:
+        if c["name"] == client_name:
+            client = c
+            break
+
+    if client is None:
         print("Client not found")
         return
     procedure = input("Procedure (e.g. Facial Cleaning): ").strip()
     master = input("Master (e.g. Anna): ").strip()
     appointment = {
-        "client": client,
+        "client": client_name,
         "procedure": procedure,
         "master": master,
         "status": "Scheduled"
@@ -38,7 +77,8 @@ def show_appointments(appointments):
         return
     print("\n--- Appointments ---")
     for i in range(len(appointments)):
-        print(f"{i + 1}. {appointments[i]['client']} | {appointments[i]['procedure']} | {appointments[i]['status']}")
+        print(
+            f"{i + 1}. {appointments[i]['client']} | {appointments[i]['procedure']} | {appointments[i]['master']} | {appointments[i]['status']}")
 
 # Функція: видалити запис
 def delete_appointment(appointments):
@@ -66,7 +106,8 @@ def search_appointments(appointments):
     found = False
     for i in range(len(appointments)):
         if appointments[i]['client'] == client:
-            print(f"{i + 1}. {appointments[i]['client']} | {appointments[i]['procedure']} | {appointments[i]['master']} | {appointments[i]['status']}")
+            print(
+                f"{i + 1}. {appointments[i]['client']} | {appointments[i]['procedure']} | {appointments[i]['master']} | {appointments[i]['status']}")
             found = True
     if not found:
         print(f"No appointments found for client '{client}'")
@@ -93,7 +134,7 @@ def change_status(appointments):
     status_choice = input("Choose new status: ")
     status_map = {
         "1": "Scheduled",
-        "2": "In Progress", 
+        "2": "In Progress",
         "3": "Done",
         "4": "Cancelled"
     }
@@ -103,10 +144,51 @@ def change_status(appointments):
     else:
         print("Invalid choice")
 
+# Функція: збереження даних
+def save_data(clients, appointments):
+    """Зберігає клієнтів та записи в JSON файли"""
+    with open("clients.json", "w") as file:
+        json.dump(clients, file)
+    with open("appointments.json", "w") as file:
+        json.dump(appointments, file)
+    print("Data saved to JSON files")
+
+# Функція: завантаження даних
+def load_data():
+    """Завантажує клієнтів та записи з JSON файлів"""
+    try:
+        with open("clients.json", "r") as file:
+            clients = json.load(file)
+    except FileNotFoundError:
+        clients = []
+
+    try:
+        with open("appointments.json", "r") as file:
+            appointments = json.load(file)
+    except FileNotFoundError:
+        appointments = []
+
+    return clients, appointments
+
+# Функція: експорт в CSV
+def export_to_csv(appointments):
+    """Експортує записи в CSV файл"""
+    with open("appointments.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Client", "Procedure", "Master", "Status"])
+        for appointment in appointments:
+            writer.writerow([
+                appointment["client"],
+                appointment["procedure"],
+                appointment["master"],
+                appointment["status"]
+            ])
+    print("Exported to appointments.csv")
+
 # Точка входу
 def main():
-    clients = []
-    appointments = []
+    clients, appointments = load_data()  # завантаження даних при старті
+
     while True:
         print("\n1. Add client")
         print("2. Create appointment")
@@ -114,8 +196,9 @@ def main():
         print("4. Delete appointment")
         print("5. Search appointments")
         print("6. Change status")
-        print("7. Exit")
-        print(f"--- Appointments: {len(appointments)} ---") # лічильник
+        print("7. Export to CSV")  # експорт в CSV
+        print("8. Exit")
+        print(f"--- Appointments: {len(appointments)} ---")  # лічильник записів
         choice = input("Choose: ")
         if choice == "1":
             add_client(clients)
@@ -130,8 +213,13 @@ def main():
         elif choice == "6":
             change_status(appointments)
         elif choice == "7":
-            print("Goodbye!"); break
+            export_to_csv(appointments)  # експорт в CSV
+        elif choice == "8":
+            save_data(clients, appointments)  # збереження при виході
+            print("Goodbye!")
+            break
         else:
             print("Unknown option, try again")
+
 
 main()
