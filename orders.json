@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "client": "Alla",
+    "procedure": "Consultation",
+    "master": "Kateryna",
+    "status": "Scheduled",
+    "date": "2026-09-02",
+    "total_price": 1000.0
+  },
+  {
+    "id": 2,
+    "client": "Tetiana",
+    "procedure": "Massage",
+    "master": "Anna",
+    "status": "Done",
+    "date": "2026-08-21",
+    "total_price": 700.0
+  },
+  {
+    "id": 3,
+    "client": "Tetiana",
+    "procedure": "Facial Massage",
+    "master": "Anna",
+    "status": "Done",
+    "date": "2026-08-21",
+    "total_price": 500.0
+  }
+]

@@ -1,1 +1,14 @@
-[{"name": "Tetiana", "phone": "+380-12-345-67-89", "email": "test@gmail.com"}]
+[
+  {
+    "id": 1,
+    "name": "Tetiana",
+    "phone": "+380-12-345-67-89",
+    "email": "test@gmail.com"
+  },
+  {
+    "id": 2,
+    "name": "Alla",
+    "phone": "+380-00-000-00-00",
+    "email": "mail@gmail.com"
+  }
+]
