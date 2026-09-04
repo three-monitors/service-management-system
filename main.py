@@ -1,11 +1,10 @@
+from managers.service_manager import ServiceManager
+from exceptions import InvalidMenuChoiceError
 import sys
 import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
-
-from exceptions import InvalidMenuChoiceError
-from managers.service_manager import ServiceManager
 
 
 def main():

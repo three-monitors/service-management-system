@@ -1,11 +1,19 @@
 from models.order import Order
 from models.client import Client
+from models.service import Service
 from exceptions import (
     ClientNotFoundError,
     InvalidPriceError,
     InvalidMenuChoiceError
 )
-import json
+from storage import (
+    load_clients,
+    save_clients,
+    load_services,
+    save_services,
+    load_orders,
+    save_orders
+)
 import re
 from typing import List, Optional
 import sys
@@ -216,70 +224,45 @@ class ServiceManager:
             print(f"{i + 1}. ID: {order.id} | {order}")
 
     def save_data(self) -> None:
-        """Збереження даних в JSON"""
+        """Збереження даних в JSON через storage.py"""
         try:
-            clients_data = [client.to_dict() for client in self.__clients]
-            orders_data = [order.to_dict() for order in self.__orders]
+            # Визначаємо шлях до файлів в папці проєкту
+            clients_file = os.path.join(current_dir, "clients.json")
+            orders_file = os.path.join(current_dir, "orders.json")
 
-            with open("clients.json", "w") as file:
-                json.dump(clients_data, file, indent=2)
-            with open("orders.json", "w") as file:
-                json.dump(orders_data, file, indent=2)
+            save_clients(clients_file, self.__clients)
+            save_orders(orders_file, self.__orders)
 
             print("Data saved to JSON files")
-
         except Exception as e:
             print(f"Помилка при збереженні: {e}")
 
     def load_data(self) -> None:
-        """Завантаження даних з JSON"""
+        """Завантаження даних з JSON через storage.py"""
         try:
-            with open("clients.json", "r") as file:
-                clients_data = json.load(file)
-                self.__clients = []
-                for client_data in clients_data:
-                    client = Client(
-                        client_data["id"],
-                        client_data["name"],
-                        client_data["phone"],
-                        client_data["email"]
-                    )
-                    self.__clients.append(client)
+            # Визначаємо шлях до файлів в папці проєкту
+            clients_file = os.path.join(current_dir, "clients.json")
+            orders_file = os.path.join(current_dir, "orders.json")
 
-                    if self.__clients:
-                        self.__next_client_id = max(
-                            client.id for client in self.__clients) + 1
-        except FileNotFoundError:
-            self.__clients = []
-            self.__next_client_id = 1
+            self.__clients = load_clients(clients_file)
+            self.__orders = load_orders(orders_file)
+
+            # Оновлюємо ID лічильники
+            if self.__clients:
+                self.__next_client_id = max(
+                    client.id for client in self.__clients) + 1
+            else:
+                self.__next_client_id = 1
+
+            if self.__orders:
+                self.__next_order_id = max(
+                    order.id for order in self.__orders) + 1
+            else:
+                self.__next_order_id = 1
+
         except Exception as e:
-            print(f"Помилка при завантаженні клієнтів: {e}")
+            print(f"Помилка при завантаженні: {e}")
             self.__clients = []
+            self.__orders = []
             self.__next_client_id = 1
-
-        try:
-            with open("orders.json", "r") as file:
-                orders_data = json.load(file)
-                self.__orders = []
-                for order_data in orders_data:
-                    order = Order(
-                        order_data["id"],
-                        order_data["client"],
-                        order_data["procedure"],
-                        order_data["master"],
-                        order_data["status"],
-                        order_data["date"],
-                        order_data["total_price"]
-                    )
-                    self.__orders.append(order)
-
-                    if self.__orders:
-                        self.__next_order_id = max(
-                            order.id for order in self.__orders) + 1
-        except FileNotFoundError:
-            self.__orders = []
-            self.__next_order_id = 1
-        except Exception as e:
-            print(f"Помилка при завантаженні замовлень: {e}")
-            self.__orders = []
             self.__next_order_id = 1

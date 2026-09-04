@@ -48,7 +48,8 @@ class Client:
         email_lower = value.lower()
         for domain in banned_domains:
             if email_lower.endswith(domain):
-                raise ValueError(f"The use of email with the {domain} domain is prohibited")
+                raise ValueError(
+                    f"The use of email with the {domain} domain is prohibited")
         self.__email = value
 
     def __str__(self) -> str:
@@ -61,3 +62,13 @@ class Client:
             "phone": self.__phone,
             "email": self.__email
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict):
+        """Класовий метод: створює об'єкт Client зі словника"""
+        return cls(
+            data["id"],
+            data["name"],
+            data["phone"],
+            data["email"]
+        )
