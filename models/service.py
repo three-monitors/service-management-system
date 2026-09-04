@@ -1,3 +1,7 @@
+from typing import Dict
+from exceptions import InvalidPriceError
+
+
 class Service:
     """Клас послуги Beauty Clinic"""
 
@@ -43,3 +47,22 @@ class Service:
 
     def __str__(self) -> str:
         return f"Service: {self.__name} | Price: {self.__price} грн. | Duration: {self.__duration} min"
+
+    def to_dict(self) -> Dict:
+        """Повертає словник для JSON"""
+        return {
+            "id": self._id,
+            "name": self.__name,
+            "price": self.__price,
+            "duration": self.__duration
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict):
+        """Класовий метод: створює об'єкт Service зі словника"""
+        return cls(
+            data["id"],
+            data["name"],
+            data["price"],
+            data["duration"]
+        )

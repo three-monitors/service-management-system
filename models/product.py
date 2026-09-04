@@ -1,3 +1,5 @@
+from exceptions import InvalidPriceError
+
 class Product:
     """Клас продукту Beauty Clinic"""
 

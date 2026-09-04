@@ -1,11 +1,12 @@
 import re
 from typing import Dict
+from exceptions import InvalidPriceError
 
 
 class Appointment:
     """Клас запису на процедуру"""
 
-    def __init__(self, id: int, client: str, procedure: str, master: str, 
+    def __init__(self, id: int, client: str, procedure: str, master: str,
                  status: str, date: str, total_price: float):
         self._id = id
         self.__client = client
@@ -57,7 +58,8 @@ class Appointment:
     def status(self, value: str):
         valid_statuses = ["Scheduled", "In Progress", "Done", "Cancelled"]
         if value not in valid_statuses:
-            raise ValueError(f"Invalid status. Must be one of: {valid_statuses}")
+            raise ValueError(
+                f"Invalid status. Must be one of: {valid_statuses}")
         self.__status = value
 
     @property
@@ -93,3 +95,16 @@ class Appointment:
             "date": self.__date,
             "total_price": self.__total_price
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict):
+        """Класовий метод: створює об'єкт Appointment зі словника"""
+        return cls(
+            data["id"],
+            data["client"],
+            data["procedure"],
+            data["master"],
+            data["status"],
+            data["date"],
+            data["total_price"]
+        )
