@@ -2,13 +2,18 @@ import logging
 import functools
 from datetime import datetime
 import time
+import os
+
+# Створюємо папку logs якщо не існує
+LOGS_DIR = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Налаштування логування для Service Management System
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("service_manager.log", encoding="utf-8"),
+        logging.FileHandler(os.path.join(LOGS_DIR, "service_manager.log"), encoding="utf-8"),
         logging.StreamHandler()
     ]
 )

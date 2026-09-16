@@ -1,3 +1,9 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, current_dir)
+
 from models.order import Order
 from models.client import Client
 from models.service import Service
@@ -6,32 +12,66 @@ from exceptions import (
     InvalidPriceError,
     InvalidMenuChoiceError
 )
-from storage import (
-    load_clients,
-    save_clients,
-    load_services,
-    save_services,
-    load_orders,
-    save_orders
+from database import get_connection, init_db
+from models_db import (
+    add_client, add_service, create_order,
+    get_orders_with_details, update_order_status,
+    get_all_orders
 )
 import re
 from typing import List, Optional
-import sys
-import os
 from decorators import log_action, validate_price, notify_client
-
-current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, current_dir)
 
 
 class ServiceManager:
     """Клас керуючого Beauty Clinic"""
 
     def __init__(self):
-        self.__clients: List[Client] = []
-        self.__orders: List[Order] = []
-        self.__next_client_id: int = 1
-        self.__next_order_id: int = 1
+        init_db()  # Ініціалізуємо базу даних
+        self.__clients = []
+        self.__orders = []
+        self.__services = []
+        self.load_from_db()  # Завантажуємо дані з бази
+
+    def load_from_db(self):
+        """Завантажує дані з бази даних"""
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Завантажуємо клієнтів
+        cursor.execute("SELECT * FROM clients")
+        self.__clients = [
+            Client(row['id'], row['name'], row['phone'], row['email'])
+            for row in cursor.fetchall()
+        ]
+
+        # Завантажуємо послуги
+        cursor.execute("SELECT * FROM services")
+        self.__services = [
+            Service(row['id'], row['name'], row['price'], row['duration'])
+            for row in cursor.fetchall()
+        ]
+
+        # Завантажуємо замовлення
+        cursor.execute("SELECT * FROM orders")
+        self.__orders = []
+        for row in cursor.fetchall():
+            # Знаходимо клієнта та послугу для замовлення
+            cursor.execute(
+                "SELECT name FROM clients WHERE id = ?", (row['client_id'],))
+            client_name = cursor.fetchone()['name']
+
+            cursor.execute(
+                "SELECT name FROM services WHERE id = ?", (row['service_id'],))
+            service_name = cursor.fetchone()['name']
+
+            order = Order(
+                row['id'], client_name, service_name, "Unknown",
+                row['status'], "", row['total_price']
+            )
+            self.__orders.append(order)
+
+        conn.close()
 
     @property
     def clients_count(self) -> int:
@@ -68,9 +108,10 @@ class ServiceManager:
                     raise ValueError(
                         f"The use of email with the {domain} domain is prohibited")
 
-            client = Client(self.__next_client_id, name, phone, email)
+            # Додаємо в базу даних
+            client_id = add_client(name, phone, email)
+            client = Client(client_id, name, phone, email)
             self.__clients.append(client)
-            self.__next_client_id += 1
             print(f"Client '{name}' added with ID: {client.id}")
 
         except ValueError as e:
@@ -86,6 +127,7 @@ class ServiceManager:
         for i, client in enumerate(self.__clients):
             print(f"{i + 1}. ID: {client.id} | {client}")
 
+    @log_action
     def delete_client(self) -> None:
         """Видалити клієнта"""
         try:
@@ -93,16 +135,39 @@ class ServiceManager:
                 raise ValueError("No clients to delete")
 
             self.list_clients()
-            raw = input("Enter client number to delete: ")
+            raw = input("Enter client ID number to delete: ")
             if not raw.isdigit():
-                raise ValueError("Please enter a number")
+                raise ValueError("Please enter a ID number")
 
-            index = int(raw) - 1
-            if index < 0 or index >= len(self.__clients):
+            client_id = int(raw)  # Отримуємо ID
+
+            # Знаходимо клієнта за ID
+            client_to_delete = None
+            index = -1
+            for i, client in enumerate(self.__clients):
+                if client.id == client_id:
+                    client_to_delete = client
+                    index = i
+                    break
+
+            if client_to_delete is None:
                 raise ValueError("Client not found")
 
-            removed = self.__clients.pop(index)
-            print(f"Deleted: ID {removed.id} | {removed.name}")
+            # Видаляємо зі списку
+            self.__clients.pop(index)
+
+            # Видаляємо з бази даних
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+            conn.commit()
+            conn.close()
+
+            # Перезавантажуємо дані з бази даних
+            self.load_from_db()
+
+            print(
+                f"Deleted: ID {client_to_delete.id} | {client_to_delete.name}")
 
         except ValueError as e:
             print(f"Помилка: {e}")
@@ -127,16 +192,20 @@ class ServiceManager:
             if client is None:
                 raise ClientNotFoundError(f"Client '{client_name}' not found")
 
-            service = input("Service (e.g. Facial Cleaning): ").strip()
-            master = input("Master (e.g. Anna): ").strip()
-            date = input("Date (YYYY-MM-DD): ").strip()
+            if len(self.__services) == 0:
+                raise ValueError("No services yet. Add services first.")
 
-            try:
-                total_price = float(input("Total price (UAH): ").strip())
-                if total_price < 0:
-                    raise InvalidPriceError("Price cannot be negative")
-            except ValueError:
-                raise InvalidPriceError("Invalid price format")
+            print("Services:", [service.name for service in self.__services])
+            service_name = input("Service name: ").strip()
+
+            service = None
+            for s in self.__services:
+                if s.name == service_name:
+                    service = s
+                    break
+
+            if service is None:
+                raise ValueError(f"Service '{service_name}' not found")
 
             # Валідація статусу
             status_input = input(
@@ -146,13 +215,16 @@ class ServiceManager:
                 raise ValueError(
                     f"Invalid status. Must be one of: {valid_statuses}")
 
-            order = Order(
-                self.__next_order_id,
-                client_name, service, master, status_input, date, total_price
-            )
-            self.__orders.append(order)
-            self.__next_order_id += 1
-            print(f"Order created with ID: {order.id}!")
+            # Створюємо замовлення в базі даних
+            order_id = create_order(client.id, service.id)
+
+            # Оновлюємо статус замовлення
+            update_order_status(order_id, status_input)
+
+            # Перезавантажуємо дані з бази
+            self.load_from_db()
+
+            print(f"Order created with ID: {order_id}!")
 
         except (ValueError, ClientNotFoundError, InvalidPriceError) as e:
             print(f"Помилка: {e}")
@@ -166,12 +238,20 @@ class ServiceManager:
                 raise ValueError("No orders yet")
 
             self.list_orders()
-            raw = input("Enter order number to update status: ")
+            raw = input("Enter order ID to update status: ")
             if not raw.isdigit():
                 raise ValueError("Please enter a number")
 
-            index = int(raw) - 1
-            if index < 0 or index >= len(self.__orders):
+            order_id = int(raw)
+
+            # Знаходимо замовлення за ID
+            order_to_update = None
+            for order in self.__orders:
+                if order.id == order_id:
+                    order_to_update = order
+                    break
+
+            if order_to_update is None:
                 raise ValueError("Order not found")
 
             print("\nStatus options:")
@@ -189,8 +269,10 @@ class ServiceManager:
             }
 
             if status_choice in status_map:
-                self.__orders[index].status = status_map[status_choice]
-                print(f"Status changed to {status_map[status_choice]}")
+                new_status = status_map[status_choice]
+                update_order_status(order_id, new_status)
+                self.load_from_db()  # Перезавантажуємо дані
+                print(f"Status changed to {new_status}")
             else:
                 raise ValueError("Invalid choice")
 
@@ -205,17 +287,32 @@ class ServiceManager:
                 raise ValueError("Nothing to delete")
 
             self.list_orders()
-            raw = input("Enter order number to delete: ")
+            raw = input("Enter order ID to delete: ")
             if not raw.isdigit():
-                raise ValueError("Please enter a number")
+                raise ValueError("Please enter a ID number")
 
-            index = int(raw) - 1
-            if index < 0 or index >= len(self.__orders):
+            order_id = int(raw)
+
+            # Знаходимо замовлення за ID
+            order_to_delete = None
+            for i, order in enumerate(self.__orders):
+                if order.id == order_id:
+                    order_to_delete = order
+                    index = i
+                    break
+
+            if order_to_delete is None:
                 raise ValueError("Order not found")
 
-            removed = self.__orders.pop(index)
-            print(
-                f"Deleted: ID {removed.id} | {removed.client} — {removed.service}")
+            # Видаляємо з бази даних
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+            conn.commit()
+            conn.close()
+
+            self.load_from_db()  # Перезавантажуємо дані
+            print(f"Deleted order with ID: {order_id}")
 
         except ValueError as e:
             print(f"Помилка: {e}")
@@ -231,45 +328,11 @@ class ServiceManager:
             print(f"{i + 1}. ID: {order.id} | {order}")
 
     def save_data(self) -> None:
-        """Збереження даних в JSON через storage.py"""
-        try:
-            # Визначаємо шлях до файлів в папці проєкту
-            clients_file = os.path.join(current_dir, "clients.json")
-            orders_file = os.path.join(current_dir, "orders.json")
-
-            save_clients(clients_file, self.__clients)
-            save_orders(orders_file, self.__orders)
-
-            print("Data saved to JSON files")
-        except Exception as e:
-            print(f"Помилка при збереженні: {e}")
+        """Збереження даних в базу даних"""
+        self.load_from_db()
+        print("Data synchronized with database")
 
     def load_data(self) -> None:
-        """Завантаження даних з JSON через storage.py"""
-        try:
-            # Визначаємо шлях до файлів в папці проєкту
-            clients_file = os.path.join(current_dir, "clients.json")
-            orders_file = os.path.join(current_dir, "orders.json")
-
-            self.__clients = load_clients(clients_file)
-            self.__orders = load_orders(orders_file)
-
-            # Оновлюємо ID лічильники
-            if self.__clients:
-                self.__next_client_id = max(
-                    client.id for client in self.__clients) + 1
-            else:
-                self.__next_client_id = 1
-
-            if self.__orders:
-                self.__next_order_id = max(
-                    order.id for order in self.__orders) + 1
-            else:
-                self.__next_order_id = 1
-
-        except Exception as e:
-            print(f"Помилка при завантаженні: {e}")
-            self.__clients = []
-            self.__orders = []
-            self.__next_client_id = 1
-            self.__next_order_id = 1
+        """Завантаження даних з бази даних"""
+        self.load_from_db()
+        print("Data loaded from database")
