@@ -18,6 +18,7 @@ import re
 from typing import List, Optional
 import sys
 import os
+from decorators import log_action, validate_price, notify_client
 
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, current_dir)
@@ -40,6 +41,7 @@ class ServiceManager:
     def orders_count(self) -> int:
         return len(self.__orders)
 
+    @log_action
     def add_client(self) -> None:
         """Додати клієнта"""
         try:
@@ -105,6 +107,8 @@ class ServiceManager:
         except ValueError as e:
             print(f"Помилка: {e}")
 
+    @log_action
+    @validate_price
     def create_order(self) -> None:
         """Створити замовлення"""
         try:
@@ -153,6 +157,8 @@ class ServiceManager:
         except (ValueError, ClientNotFoundError, InvalidPriceError) as e:
             print(f"Помилка: {e}")
 
+    @log_action
+    @notify_client
     def update_status(self) -> None:
         """Оновити статус замовлення"""
         try:
@@ -191,6 +197,7 @@ class ServiceManager:
         except ValueError as e:
             print(f"Помилка: {e}")
 
+    @log_action
     def delete_order(self) -> None:
         """Видалити замовлення"""
         try:
