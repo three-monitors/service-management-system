@@ -209,8 +209,8 @@ class ServiceManager:
 
             # Валідація статусу
             status_input = input(
-                "Status (Scheduled/In Progress/Done/Cancelled): ").strip()
-            valid_statuses = ["Scheduled", "In Progress", "Done", "Cancelled"]
+                "Status (Created/Scheduled/In Progress/Done/Completed/Cancelled): ").strip()
+            valid_statuses = ["Created", "Scheduled", "In Progress", "Done", "Completed", "Cancelled"]
             if status_input not in valid_statuses:
                 raise ValueError(
                     f"Invalid status. Must be one of: {valid_statuses}")
@@ -255,17 +255,21 @@ class ServiceManager:
                 raise ValueError("Order not found")
 
             print("\nStatus options:")
-            print("1. Scheduled")
-            print("2. In Progress")
-            print("3. Done")
-            print("4. Cancelled")
+            print("1. Created")
+            print("2. Scheduled")
+            print("3. In Progress")
+            print("4. Done")
+            print("5. Completed")
+            print("6. Cancelled")
             status_choice = input("Choose new status: ")
 
             status_map = {
-                "1": "Scheduled",
-                "2": "In Progress",
-                "3": "Done",
-                "4": "Cancelled"
+                "1": "Created",
+                "2": "Scheduled",
+                "3": "In Progress",
+                "4": "Done",
+                "5": "Completed",
+                "6": "Cancelled"
             }
 
             if status_choice in status_map:
