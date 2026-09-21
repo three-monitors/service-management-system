@@ -42,7 +42,6 @@ def main():
     update_order_status(order2_id, "In Progress")
     update_order_status(order3_id, "Created")
     update_order_status(order4_id, "Scheduled")
-    update_order_status(order5_id, "In Progress")
     print("Статуси оновлені")
 
     print("\n=== Додавання товарів на склад ===")

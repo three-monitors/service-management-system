@@ -56,7 +56,14 @@ class Appointment:
 
     @status.setter
     def status(self, value: str):
-        valid_statuses = ["Scheduled", "In Progress", "Done", "Cancelled"]
+        valid_statuses = [
+            "Created",      # Для товарів/рахунків
+            "Scheduled",    # Для послуг
+            "In Progress",  # Загальний
+            "Done",         # Для послуг
+            "Completed",    # Для товарів
+            "Cancelled"     # Загальний
+        ]
         if value not in valid_statuses:
             raise ValueError(
                 f"Invalid status. Must be one of: {valid_statuses}")

@@ -1,62 +1,62 @@
-from managers.service_manager import ServiceManager
-from exceptions import InvalidMenuChoiceError
-import sys
 import os
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+import sys
+import logging
+from config import get_settings
+from cli import build_parser
 
 
 def main():
-    """Головна функція програми"""
-    try:
-        manager = ServiceManager()
-        manager.load_data()
+    settings = get_settings()
 
-        while True:
-            print("\n1. Add client")
-            print("2. List clients")
-            print("3. Delete client")
-            print("4. Create order")
-            print("5. List orders")
-            print("6. Update status")
-            print("7. Delete order")
-            print("8. Exit")
-            print(f"--- Orders: {manager.orders_count} ---")
-            print(f"--- Clients: {manager.clients_count} ---")
+    logging.basicConfig(
+        level=settings["log_level"],
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler("service_manager.log", encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
+    )
 
-            choice = input("Choose: ")
+    parser = build_parser()
+    args = parser.parse_args()
 
-            if choice == "1":
-                manager.add_client()
-                manager.save_data()  # автоматичне збереження
-            elif choice == "2":
-                manager.list_clients()
-            elif choice == "3":
-                manager.delete_client()
-                manager.save_data()  # автоматичне збереження
-            elif choice == "4":
-                manager.create_order()
-                manager.save_data()  # автоматичне збереження
-            elif choice == "5":
-                manager.list_orders()
-            elif choice == "6":
-                manager.update_status()
-                manager.save_data()  # автоматичне збереження
-            elif choice == "7":
-                manager.delete_order()
-                manager.save_data()  # автоматичне збереження
-            elif choice == "8":
-                manager.save_data()
-                print("Goodbye!")
-                break
-            else:
-                raise InvalidMenuChoiceError(f"Invalid menu choice: {choice}")
+    if args.command == "client":
+        if args.client_command == "add":
+            # TODO: storage.add_client(args.name, args.phone, args.email)
+            print(f"✅ Клієнта додано: {args.name} | {args.phone}")
+        elif args.client_command == "list":
+            # TODO: storage.list_clients()
+            print("👥 Список клієнтів (підключіть storage)")
+        elif args.client_command == "show":
+            # TODO: storage.get_client(args.id)
+            print(f"👤 Клієнт #{args.id} (підключіть storage)")
 
-    except InvalidMenuChoiceError as e:
-        print(f"Помилка меню: {e}")
-    except Exception as e:
-        print(f"Критична помилка: {e}")
+    elif args.command == "service":
+        if args.service_command == "add":
+            # TODO: storage.add_service(...)
+            print(
+                f"✅ Послугу додано: {args.name} — {args.price} {settings['currency']}")
+        elif args.service_command == "list":
+            print("🛠️  Список послуг (підключіть storage)")
+
+    elif args.command == "order":
+        if args.order_command == "create":
+            # TODO: storage.create_order(args.client_id, args.service_id)
+            print(
+                f"✅ Замовлення створено: клієнт #{args.client_id}, послуга #{args.service_id}")
+        elif args.order_command == "list":
+            print("📋 Замовлення (підключіть storage)")
+        elif args.order_command == "status":
+            # TODO: storage.update_order_status(args.id, args.status)
+            print(f"🔄 Статус замовлення #{args.id} → {args.status}")
+        elif args.order_command == "delete":
+            print(f"🗑️  Замовлення #{args.id} видалено")
+
+    elif args.command == "report":
+        print(f"📊 Звіт за період: {args.period} (підключіть storage)")
+
+    elif args.command == "export":
+        print(f"📤 Експорт у {args.format.upper()} (підключіть storage)")
 
 
 if __name__ == "__main__":
