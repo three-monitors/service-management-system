@@ -8,8 +8,10 @@ class Service:
     def __init__(self, id: int, name: str, price: float, duration: int):
         self._id = id
         self.__name = name
-        self.__price = price
-        self.__duration = duration
+
+        # Валідація через сеттери
+        self.price = price  # Використовує setter з валідацією
+        self.duration = duration  # Використовує setter з валідацією
 
     @property
     def id(self) -> int:
