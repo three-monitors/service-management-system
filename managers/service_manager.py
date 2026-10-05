@@ -1,26 +1,27 @@
-import sys
-import os
-
-current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, current_dir)
-
-from models.order import Order
-from models.client import Client
-from models.service import Service
-from exceptions import (
-    ClientNotFoundError,
-    InvalidPriceError,
-    InvalidMenuChoiceError
-)
-from database import get_connection, init_db
+from decorators import log_action, validate_price, notify_client
+from typing import List, Optional
+import re
 from models_db import (
     add_client, add_service, create_order,
     get_orders_with_details, update_order_status,
     get_all_orders
 )
-import re
-from typing import List, Optional
-from decorators import log_action, validate_price, notify_client
+from database import get_connection, init_db
+from exceptions import (
+    ClientNotFoundError,
+    InvalidPriceError,
+    InvalidMenuChoiceError
+)
+from models.service import Service
+from models.client import Client
+from models.order import Order
+import sys
+import os
+
+# Додаємо кореневу папку проєкту до sys.path
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 
 class ServiceManager:
@@ -41,14 +42,24 @@ class ServiceManager:
         # Завантажуємо клієнтів
         cursor.execute("SELECT * FROM clients")
         self.__clients = [
-            Client(row['id'], row['name'], row['phone'], row['email'])
+            Client(
+                row['id'],
+                row['name'],
+                row['phone'],
+                row['email']
+            )
             for row in cursor.fetchall()
         ]
 
         # Завантажуємо послуги
         cursor.execute("SELECT * FROM services")
         self.__services = [
-            Service(row['id'], row['name'], row['price'], row['duration'])
+            Service(
+                row['id'],
+                row['name'],
+                row['price'],
+                row['duration']
+            )
             for row in cursor.fetchall()
         ]
 
@@ -57,21 +68,52 @@ class ServiceManager:
         self.__orders = []
         for row in cursor.fetchall():
             # Знаходимо клієнта та послугу для замовлення
+            cursor.execute("SELECT * FROM orders")
+        self.__orders = []
+
+        for row in cursor.fetchall():
             cursor.execute(
-                "SELECT name FROM clients WHERE id = ?", (row['client_id'],))
-            client_name = cursor.fetchone()['name']
+                "SELECT name FROM clients WHERE id = ?",
+                (row['client_id'],)
+            )
+            client_row = cursor.fetchone()
+            client_name = client_row['name'] if client_row else "Unknown"
 
             cursor.execute(
-                "SELECT name FROM services WHERE id = ?", (row['service_id'],))
-            service_name = cursor.fetchone()['name']
+                "SELECT name FROM services WHERE id = ?",
+                (row['service_id'],)
+            )
+            service_row = cursor.fetchone()
+            service_name = service_row['name'] if service_row else "Unknown"
 
             order = Order(
-                row['id'], client_name, service_name, "Unknown",
-                row['status'], "", row['total_price']
+                row['id'],
+                client_name,
+                service_name,
+                "Unknown",
+                row['status'],
+                "",
+                row['total_price']
             )
             self.__orders.append(order)
 
         conn.close()
+
+    # Властивості для доступу до даних
+    @property
+    def clients(self):
+        """Повертає список клієнтів"""
+        return self.__clients
+
+    @property
+    def services(self):
+        """Повертає список послуг"""
+        return self.__services
+
+    @property
+    def orders(self):
+        """Повертає список замовлень"""
+        return self.__orders
 
     @property
     def clients_count(self) -> int:
@@ -81,51 +123,159 @@ class ServiceManager:
     def orders_count(self) -> int:
         return len(self.__orders)
 
+    # Допоміжні методи для клієнта
+    @staticmethod
+    def normalize_phone(phone: str) -> str:
+        """
+        Нормалізує український номер телефону.
+        Приймаються, наприклад:
+        +380-67-123-45-67
+        +380671234567
+        380671234567
+        80671234567
+        0671234567
+        067 123 45 67
+        +380 67 123 45 67
+
+        Результат:
+        +380-67-123-45-67
+        """
+
+        if not isinstance(phone, str):
+            raise ValueError("Номер телефону має бути текстом")
+        # Прибираємо все, крім цифр
+        digits = re.sub(r"\D", "", phone)
+        # 380XXXXXXXXX
+        if len(digits) == 12 and digits.startswith("380"):
+            digits = digits[3:]
+        # 80XXXXXXXXX
+        elif len(digits) == 11 and digits.startswith("80"):
+            digits = digits[2:]
+        # 0XXXXXXXXX
+        elif len(digits) == 10 and digits.startswith("0"):
+            digits = digits[1:]
+        # 8XXXXXXXXX
+        elif len(digits) == 10 and digits.startswith("8"):
+            digits = digits[1:]
+        else:
+            raise ValueError(
+                "Невірний номер телефону. "
+                "Введіть український номер, наприклад "
+                "+380-67-123-45-67 або 067 123 45 67"
+            )
+        if len(digits) != 9:
+            raise ValueError(
+                "Невірний номер телефону. "
+                "Український номер повинен містити 9 цифр "
+                "після коду 380"
+            )
+        return (
+            f"+380-{digits[:2]}-{digits[2:5]}-"
+            f"{digits[5:7]}-{digits[7:9]}"
+        )
+
+    @staticmethod
+    def validate_email(email: str) -> str:
+        """Перевіряє та повертає email."""
+
+        if not isinstance(email, str):
+            raise ValueError("Email має бути текстом")
+        email = email.strip()
+        email_pattern = (
+            r"^[a-zA-Z0-9._%+-]+@"
+            r"[a-zA-Z0-9.-]+\."
+            r"[a-zA-Z]{2,}$"
+        )
+        if not re.fullmatch(email_pattern, email):
+            raise ValueError("Невірний формат email")
+        banned_domains = [".ru", ".su", ".рф"]
+        email_lower = email.lower()
+        for domain in banned_domains:
+            if email_lower.endswith(domain):
+                raise ValueError(
+                    f"Використання email з доменом "
+                    f"{domain} заборонено"
+                )
+        return email
+
+    # Додавання клієнта через консоль
     @log_action
     def add_client(self) -> None:
-        """Додати клієнта"""
+        """Додати клієнта через консоль."""
         try:
             name = input("Client name: ").strip()
             if name == "":
                 raise ValueError("Name cannot be empty")
 
             for client in self.__clients:
-                if client.name == name:
+                if client.name.lower() == name.lower():
                     raise ValueError("Client already exists")
-
-            phone = input("Phone (format: +380-XX-XXX-XX-XX): ").strip()
-            if not re.fullmatch(r"\+\d{3}-\d{2}-\d{3}-\d{2}-\d{2}", phone):
-                raise ValueError("Invalid phone format. Use +380-XX-XXX-XX-XX")
-
+            phone = input(
+                "Phone (format: +380-XX-XXX-XX-XX): "
+            ).strip()
+            phone = self.normalize_phone(phone)
             email = input("Email: ").strip()
-            if not re.fullmatch(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", email):
-                raise ValueError("Invalid email format")
-
-            banned_domains = [".ru", ".su", ".рф"]
-            email_lower = email.lower()
-            for domain in banned_domains:
-                if email_lower.endswith(domain):
-                    raise ValueError(
-                        f"The use of email with the {domain} domain is prohibited")
-
-            # Додаємо в базу даних
+            email = self.validate_email(email)
             client_id = add_client(name, phone, email)
-            client = Client(client_id, name, phone, email)
+            client = Client(
+                client_id,
+                name,
+                phone,
+                email
+            )
             self.__clients.append(client)
-            print(f"Client '{name}' added with ID: {client.id}")
-
+            print(
+                f"Client '{name}' added with ID: {client.id}"
+            )
         except ValueError as e:
             print(f"Помилка: {e}")
 
+    # Додавання клієнта через Telegram
+    @log_action
+    def add_client_with_params(
+        self,
+        name: str,
+        phone: str,
+        email: str
+    ) -> int:
+        """Додає клієнта з готовими параметрами."""
+        name = name.strip()
+        if not name:
+            raise ValueError(
+                "Ім'я клієнта не може бути порожнім"
+            )
+        for client in self.__clients:
+            if client.name.lower() == name.lower():
+                raise ValueError(
+                    f"Клієнт '{name}' вже існує"
+                )
+        phone = self.normalize_phone(phone)
+        email = self.validate_email(email)
+        client_id = add_client(
+            name,
+            phone,
+            email
+        )
+        client = Client(
+            client_id,
+            name,
+            phone,
+            email
+        )
+        self.__clients.append(client)
+        return client_id
+
+    # Клієнти
     def list_clients(self) -> None:
-        """Перегляд списку клієнтів"""
+        """Перегляд списку клієнтів."""
         if len(self.__clients) == 0:
             print("No clients yet")
             return
-
         print("\n--- Clients ---")
         for i, client in enumerate(self.__clients):
-            print(f"{i + 1}. ID: {client.id} | {client}")
+            print(
+                f"{i + 1}. ID: {client.id} | {client}"
+            )
 
     @log_action
     def delete_client(self) -> None:
@@ -172,6 +322,7 @@ class ServiceManager:
         except ValueError as e:
             print(f"Помилка: {e}")
 
+    # Замовлення
     @log_action
     @validate_price
     def create_order(self) -> None:
@@ -210,7 +361,8 @@ class ServiceManager:
             # Валідація статусу
             status_input = input(
                 "Status (Created/Scheduled/In Progress/Done/Completed/Cancelled): ").strip()
-            valid_statuses = ["Created", "Scheduled", "In Progress", "Done", "Completed", "Cancelled"]
+            valid_statuses = ["Created", "Scheduled",
+                              "In Progress", "Done", "Completed", "Cancelled"]
             if status_input not in valid_statuses:
                 raise ValueError(
                     f"Invalid status. Must be one of: {valid_statuses}")
@@ -331,6 +483,7 @@ class ServiceManager:
         for i, order in enumerate(self.__orders):
             print(f"{i + 1}. ID: {order.id} | {order}")
 
+    # Синхронізація
     def save_data(self) -> None:
         """Збереження даних в базу даних"""
         self.load_from_db()

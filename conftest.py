@@ -48,7 +48,7 @@ def sample_service():
 
 @pytest.fixture
 def sample_order():
-    """Фікстура для тестового замовлення з teardown"""
+    """Фікстура для тестового замовлення"""
     order_data = {
         "client_id": 1,
         "service_id": 1,
