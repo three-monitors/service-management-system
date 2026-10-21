@@ -1,5 +1,5 @@
 -- Встановлюємо схему за замовчуванням
-SET search_path TO project, public;
+SET search_path TO project;
 
 -- 3. Безпечний UPDATE і DELETE (спочатку SELECT, потім транзакція)
 

@@ -1,5 +1,5 @@
 -- Встановлюємо схему за замовчуванням
-SET search_path TO project, public;
+SET search_path TO project;
 
 -- 2. 5 запитів SELECT з LIKE, ORDER BY і LIMIT
 
