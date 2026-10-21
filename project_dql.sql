@@ -1,5 +1,5 @@
 -- Встановлюємо схему за замовчуванням
-SET search_path TO project, public;
+SET search_path TO project;
 
 -- Рівень 4. Власний проєкт
 

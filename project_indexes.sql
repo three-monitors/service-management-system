@@ -1,5 +1,5 @@
 -- Встановлюємо схему за замовчуванням
-SET search_path TO project, public;
+SET search_path TO project;
 
 -- 4. Індекси на зовнішні ключі та перевірка через EXPLAIN ANALYZE
 

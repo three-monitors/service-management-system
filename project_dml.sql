@@ -2,7 +2,7 @@
 CREATE SCHEMA IF NOT EXISTS project;
 
 -- Встановлюємо схему за замовчуванням
-SET search_path TO project, public;
+SET search_path TO project;
 
 -- Створення таблиць проєкту
 DROP TABLE IF EXISTS project.order_items;
